@@ -1,15 +1,19 @@
 {
   "name": "aikiyara",
-  "version": "1.0.0",
-  "description": "Aikiyara productivity and AI assistant",
-  "main": "server.js",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node --watch server.js"
   },
+  "engines": { "node": ">=20.16.0" },
   "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2"
+    "express": "5.1.0",
+    "express-rate-limit": "8.7.0",
+    "firebase-admin": "13.5.0",
+    "mammoth": "1.12.3",
+    "multer": "2.4.0",
+    "pdf-parse": "2.4.5"
   }
 }
