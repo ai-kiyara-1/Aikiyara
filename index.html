@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Aikiyara | AI Focus Planner</title>
-    <meta name="description" content="Aikiyara is a productivity planner with cloud-synced tasks, notes, and focus sessions." />
+    <meta name="description" content="Aikiyara productivity planner with Google login, Firebase sync, notes, focus timer, and AI assistant." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -15,15 +15,28 @@
       <div class="auth-card">
         <div class="brand-wrap">
           <div class="brand-icon">A</div>
-          <div><p class="eyebrow">AI productivity</p><h1>Aikiyara</h1></div>
+          <div>
+            <p class="eyebrow">AI productivity</p>
+            <h1>Aikiyara</h1>
+          </div>
         </div>
+
         <h2 id="authTitle">Welcome back</h2>
-        <p class="auth-copy">Sign in to sync your tasks and notes across devices.</p>
+        <p class="auth-copy">Sign in to sync your tasks, notes, and AI plan.</p>
+
         <form id="authForm" class="auth-form">
           <input id="emailInput" type="email" placeholder="Email address" autocomplete="email" required />
           <input id="passwordInput" type="password" placeholder="Password (6+ characters)" autocomplete="current-password" minlength="6" required />
           <button id="authSubmit" class="primary-btn" type="submit">Sign in</button>
         </form>
+
+        <div class="divider"><span>or</span></div>
+
+        <button id="googleSignInBtn" class="google-btn" type="button">
+          <span class="google-g">G</span>
+          Continue with Google
+        </button>
+
         <button id="authModeToggle" class="text-btn" type="button">New here? Create an account</button>
         <p id="authMessage" class="auth-message" role="status"></p>
       </div>
@@ -33,9 +46,18 @@
       <aside class="sidebar">
         <div class="brand-wrap">
           <div class="brand-icon">A</div>
-          <div><p class="eyebrow">AI productivity</p><h1>Aikiyara</h1></div>
+          <div>
+            <p class="eyebrow">AI productivity</p>
+            <h1>Aikiyara</h1>
+          </div>
         </div>
-        <div class="panel user-panel"><span class="status-dot"></span><span id="userEmail">Signed in</span><button id="signOutBtn" class="text-btn">Sign out</button></div>
+
+        <div class="panel user-panel">
+          <span class="status-dot"></span>
+          <span id="userEmail">Signed in</span>
+          <button id="signOutBtn" class="text-btn">Sign out</button>
+        </div>
+
         <div class="panel">
           <p class="panel-title">Quick actions</p>
           <button class="quick-action" data-task="Plan my top 3 priorities for today">Top 3 priorities</button>
@@ -43,6 +65,7 @@
           <button class="quick-action" data-task="Plan a 30 minute learning sprint">Learning sprint</button>
           <button class="quick-action" data-task="Draft a clear follow-up message to my team">Follow-up note</button>
         </div>
+
         <div class="panel stats-panel">
           <p class="panel-title">Day summary</p>
           <div class="stat-row"><span>Tasks</span><strong id="totalTasks">0</strong></div>
@@ -53,17 +76,83 @@
 
       <main class="main-panel">
         <header class="topbar">
-          <div><p class="eyebrow">Welcome back</p><h2 id="greeting">Let’s get productive</h2></div>
-          <div class="topbar-actions"><button id="themeToggle" class="icon-btn" aria-label="Toggle theme">🌙</button><button id="clearAllBtn" class="secondary-btn">Clear all</button></div>
+          <div>
+            <p class="eyebrow">Welcome back</p>
+            <h2 id="greeting">Let’s get productive</h2>
+          </div>
+          <div class="topbar-actions">
+            <button id="themeToggle" class="icon-btn" aria-label="Toggle theme">🌙</button>
+            <button id="clearAllBtn" class="secondary-btn">Clear all</button>
+          </div>
         </header>
+
         <section class="hero-grid">
-          <div class="card focus-card"><div class="card-head"><h3>Focus session</h3><span class="badge success">25 min</span></div><div class="timer" id="timerDisplay">25:00</div><div class="timer-actions"><button id="startTimerBtn" class="primary-btn">Start</button><button id="resetTimerBtn" class="secondary-btn small">Reset</button></div></div>
-          <div class="card insight-card"><div class="card-head"><h3>AI insight</h3><span class="badge">Today</span></div><p id="insightText">Start with one high-impact task and finish it before anything else.</p></div>
+          <div class="card focus-card">
+            <div class="card-head">
+              <h3>Focus session</h3>
+              <span class="badge success">25 min</span>
+            </div>
+            <div class="timer" id="timerDisplay">25:00</div>
+            <div class="timer-actions">
+              <button id="startTimerBtn" class="primary-btn">Start</button>
+              <button id="resetTimerBtn" class="secondary-btn small">Reset</button>
+            </div>
+          </div>
+
+          <div class="card insight-card">
+            <div class="card-head">
+              <h3>AI insight</h3>
+              <span class="badge">Today</span>
+            </div>
+            <p id="insightText">Start with one high-impact task and finish it before anything else.</p>
+          </div>
         </section>
-        <section class="task-box"><form id="taskForm" autocomplete="off"><input id="taskInput" type="text" placeholder="Add a task, idea, or goal..." maxlength="140" required /><button type="submit" class="primary-btn">Add task</button></form></section>
+
+        <section class="task-box">
+          <form id="taskForm" autocomplete="off">
+            <input id="taskInput" type="text" placeholder="Add a task, idea, or goal..." maxlength="140" required />
+            <button type="submit" class="primary-btn">Add task</button>
+          </form>
+        </section>
+
         <section class="content-grid">
-          <div class="card"><div class="card-head"><h3>Task board</h3><span id="taskCountBadge" class="badge">0 tasks</span></div><ul id="taskList" class="task-list"></ul></div>
-          <div class="card note-card"><div class="card-head"><h3>Quick notes</h3><span class="badge subtle">Cloud synced</span></div><textarea id="notesInput" placeholder="Write ideas, reminders, or next steps..."></textarea><span id="saveStatus" class="save-status">Ready</span></div>
+          <div class="card">
+            <div class="card-head">
+              <h3>Task board</h3>
+              <span id="taskCountBadge" class="badge">0 tasks</span>
+            </div>
+            <ul id="taskList" class="task-list"></ul>
+          </div>
+
+          <div class="card note-card">
+            <div class="card-head">
+              <h3>Quick notes</h3>
+              <span class="badge subtle">Cloud synced</span>
+            </div>
+            <textarea id="notesInput" placeholder="Write ideas, reminders, or next steps..."></textarea>
+            <span id="saveStatus" class="save-status">Ready</span>
+          </div>
+        </section>
+
+        <section class="card ai-panel">
+          <div class="card-head ai-head">
+            <h3>AI Assistant</h3>
+            <span class="badge subtle">Gemini</span>
+          </div>
+
+          <div class="api-key-row">
+            <input id="aiKeyInput" type="password" placeholder="Paste Gemini API key" />
+            <button id="saveApiKeyBtn" class="secondary-btn small" type="button">Save key</button>
+          </div>
+
+          <div id="aiMessages" class="ai-messages">
+            <div class="ai-message ai-bot">Ask me to plan your day or summarize your tasks.</div>
+          </div>
+
+          <div class="ai-input-row">
+            <input id="aiInput" type="text" placeholder="Ask AI about your tasks..." />
+            <button id="aiSendBtn" class="primary-btn" type="button">Send</button>
+          </div>
         </section>
       </main>
     </div>
