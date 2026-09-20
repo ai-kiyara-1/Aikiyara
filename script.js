@@ -1,140 +1,193 @@
-const STORAGE_KEYS = {
-  tasks: 'aikiyara-tasks',
-  notes: 'aikiyara-notes'
+import { getApps, initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBf07alINlpQxnvV-EP_KIMFxyJwYbrwKU",
+  authDomain: "aikiyara-5bb4b.firebaseapp.com",
+  projectId: "aikiyara-5bb4b",
+  storageBucket: "aikiyara-5bb4b.firebasestorage.app",
+  messagingSenderId: "367532191724",
+  appId: "1:367532191724:web:74990c4f3bf86b9f1b5ac9",
+  measurementId: "G-JL9SHN4PTX"
 };
 
-const taskForm = document.getElementById('taskForm');
-const taskInput = document.getElementById('taskInput');
-const taskList = document.getElementById('taskList');
-const notesInput = document.getElementById('notesInput');
-const clearAllBtn = document.getElementById('clearAllBtn');
-const totalTasksEl = document.getElementById('totalTasks');
-const doneTasksEl = document.getElementById('doneTasks');
-const focusScoreEl = document.getElementById('focusScore');
-const taskBadgeEl = document.getElementById('taskBadge');
-const greetingEl = document.getElementById('greeting');
-
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const uid = () => crypto.randomUUID();
 const defaultTasks = [
-  { id: crypto.randomUUID(), text: 'Review project goals', done: false },
-  { id: crypto.randomUUID(), text: 'Finish the next milestone', done: false },
-  { id: crypto.randomUUID(), text: 'Write a short update note', done: true }
+  { id: uid(), text: "Review today's goals", done: false },
+  { id: uid(), text: "Complete one high-impact task", done: true },
+  { id: uid(), text: "Write a quick update note", done: false }
 ];
 
-function getTasks() {
-  const stored = JSON.parse(localStorage.getItem(STORAGE_KEYS.tasks) || 'null');
-  return Array.isArray(stored) && stored.length ? stored : defaultTasks;
+const $ = id => document.getElementById(id);
+const authScreen = $("authScreen");
+const appShell = $("appShell");
+const authForm = $("authForm");
+const authTitle = $("authTitle");
+const authModeToggle = $("authModeToggle");
+const authMessage = $("authMessage");
+const authSubmit = $("authSubmit");
+const emailInput = $("emailInput");
+const passwordInput = $("passwordInput");
+const userEmail = $("userEmail");
+const signOutBtn = $("signOutBtn");
+const taskForm = $("taskForm");
+const taskInput = $("taskInput");
+const taskList = $("taskList");
+const notesInput = $("notesInput");
+const saveStatus = $("saveStatus");
+const clearAllBtn = $("clearAllBtn");
+const totalTasksEl = $("totalTasks");
+const doneTasksEl = $("doneTasks");
+const focusScoreEl = $("focusScore");
+const taskCountBadge = $("taskCountBadge");
+const greeting = $("greeting");
+const insightText = $("insightText");
+const timerDisplay = $("timerDisplay");
+const startTimerBtn = $("startTimerBtn");
+const resetTimerBtn = $("resetTimerBtn");
+const themeToggle = $("themeToggle");
+
+let createMode = false;
+let currentUser = null;
+let tasks = [];
+let saveTimer = null;
+let remainingSeconds = 1500;
+let timerId = null;
+
+const userRef = () => currentUser && doc(db, "users", currentUser.uid);
+const setAuthMessage = (message, error = false) => { authMessage.textContent = message; authMessage.style.color = error ? "#f87171" : "var(--muted)"; };
+
+async function saveUserData() {
+  if (!currentUser) return;
+  saveStatus.textContent = "Saving...";
+  await setDoc(userRef(), {
+    tasks,
+    notes: notesInput.value,
+    theme: document.body.classList.contains("light-mode") ? "light" : "dark",
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  saveStatus.textContent = "Saved to cloud";
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { saveStatus.textContent = "Ready"; }, 1400);
 }
 
-function saveTasks(tasks) {
-  localStorage.setItem(STORAGE_KEYS.tasks, JSON.stringify(tasks));
+function queueSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveUserData().catch(error => { console.error(error); saveStatus.textContent = "Save failed"; }), 450);
 }
 
-function updateGreeting() {
-  const hour = new Date().getHours();
-  let text = 'Let’s get productive';
-
-  if (hour < 12) text = 'Good morning';
-  else if (hour < 18) text = 'Good afternoon';
-  else text = 'Good evening';
-
-  greetingEl.textContent = text;
+async function loadUserData() {
+  const snapshot = await getDoc(userRef());
+  const data = snapshot.exists() ? snapshot.data() : {};
+  tasks = Array.isArray(data.tasks) ? data.tasks : defaultTasks;
+  notesInput.value = data.notes || "";
+  applyTheme(data.theme || "dark");
+  renderTasks();
 }
 
 function renderTasks() {
-  const tasks = getTasks();
-  taskList.innerHTML = '';
-
+  taskList.replaceChildren();
   tasks.forEach(task => {
-    const item = document.createElement('li');
-    item.className = `task-item ${task.done ? 'completed' : ''}`;
-
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
+    const item = document.createElement("li");
+    item.className = `task-item ${task.done ? "done" : ""}`;
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
     checkbox.checked = task.done;
-    checkbox.setAttribute('aria-label', `Mark ${task.text} as done`);
-    checkbox.addEventListener('change', () => {
-      const allTasks = getTasks().map(t => (
-        t.id === task.id ? { ...t, done: !t.done } : t
-      ));
-      saveTasks(allTasks);
+    checkbox.setAttribute("aria-label", `Complete ${task.text}`);
+    checkbox.addEventListener("change", () => {
+      tasks = tasks.map(entry => entry.id === task.id ? { ...entry, done: checkbox.checked } : entry);
       renderTasks();
+      queueSave();
     });
-
-    const text = document.createElement('span');
-    text.className = 'task-text';
-    text.textContent = task.text;
-
-    const delBtn = document.createElement('button');
-    delBtn.type = 'button';
-    delBtn.className = 'task-action';
-    delBtn.textContent = '×';
-    delBtn.title = 'Delete task';
-    delBtn.setAttribute('aria-label', `Delete ${task.text}`);
-    delBtn.addEventListener('click', () => {
-      const filtered = getTasks().filter(t => t.id !== task.id);
-      saveTasks(filtered);
+    const label = document.createElement("span");
+    label.className = "task-text";
+    label.textContent = task.text;
+    const remove = document.createElement("button");
+    remove.className = "task-action";
+    remove.type = "button";
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", `Delete ${task.text}`);
+    remove.addEventListener("click", () => {
+      tasks = tasks.filter(entry => entry.id !== task.id);
       renderTasks();
+      queueSave();
     });
-
-    item.appendChild(checkbox);
-    item.appendChild(text);
-    item.appendChild(delBtn);
+    item.append(checkbox, label, remove);
     taskList.appendChild(item);
   });
-
   const total = tasks.length;
   const done = tasks.filter(task => task.done).length;
-  const focus = total ? Math.round((done / total) * 100) : 0;
-
-  totalTasksEl.textContent = String(total);
-  doneTasksEl.textContent = String(done);
-  focusScoreEl.textContent = `${focus}%`;
-  taskBadgeEl.textContent = `${total} task${total === 1 ? '' : 's'}`;
+  totalTasksEl.textContent = total;
+  doneTasksEl.textContent = done;
+  focusScoreEl.textContent = `${total ? Math.round(done / total * 100) : 0}%`;
+  taskCountBadge.textContent = `${total} task${total === 1 ? "" : "s"}`;
+  insightText.textContent = !total ? "Add one important task and begin with the hardest thing first." : done === total ? "Everything is complete. Plan your next win." : `${total - done} task${total - done > 1 ? "s are" : " is"} still open. Focus on one meaningful step at a time.`;
 }
 
-function addTask(text) {
-  const trimmed = text.trim();
-  if (!trimmed) return;
-
-  const tasks = getTasks();
-  tasks.unshift({ id: crypto.randomUUID(), text: trimmed, done: false });
-  saveTasks(tasks);
-  renderTasks();
+function applyTheme(theme) {
+  const light = theme === "light";
+  document.body.classList.toggle("light-mode", light);
+  themeToggle.textContent = light ? "🌙" : "☀️";
 }
 
-taskForm.addEventListener('submit', event => {
+function formatTime(seconds) { return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`; }
+function updateTimer() { timerDisplay.textContent = formatTime(remainingSeconds); }
+function resetTimer() { clearInterval(timerId); timerId = null; remainingSeconds = 1500; startTimerBtn.textContent = "Start"; updateTimer(); }
+function toggleTimer() {
+  if (timerId) { clearInterval(timerId); timerId = null; startTimerBtn.textContent = "Resume"; return; }
+  startTimerBtn.textContent = "Pause";
+  timerId = setInterval(() => {
+    if (remainingSeconds <= 0) { resetTimer(); alert("Focus session complete. Great work!"); return; }
+    remainingSeconds -= 1;
+    updateTimer();
+  }, 1000);
+}
+
+function updateGreeting() { const hour = new Date().getHours(); greeting.textContent = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"; }
+
+let unsubscribeAuth = onAuthStateChanged(auth, async user => {
+  currentUser = user;
+  if (!user) {
+    authScreen.classList.remove("hidden");
+    appShell.classList.add("hidden");
+    return;
+  }
+  userEmail.textContent = user.email || "Signed in";
+  authScreen.classList.add("hidden");
+  appShell.classList.remove("hidden");
+  try {
+    const existing = await getDoc(userRef());
+    if (!existing.exists()) await setDoc(userRef(), { tasks: defaultTasks, notes: "", theme: "dark", updatedAt: serverTimestamp() });
+    await loadUserData();
+  } catch (error) { console.error(error); saveStatus.textContent = "Cloud connection failed"; }
+});
+
+authForm.addEventListener("submit", async event => {
   event.preventDefault();
-  addTask(taskInput.value);
-  taskInput.value = '';
-  taskInput.focus();
+  setAuthMessage("Working...");
+  try {
+    if (createMode) await createUserWithEmailAndPassword(auth, emailInput.value.trim(), passwordInput.value);
+    else await signInWithEmailAndPassword(auth, emailInput.value.trim(), passwordInput.value);
+    authForm.reset();
+  } catch (error) {
+    const messages = { "auth/invalid-credential": "Email ya password galat hai.", "auth/email-already-in-use": "Yeh email already registered hai.", "auth/weak-password": "Password kam se kam 6 characters ka hona chahiye." };
+    setAuthMessage(messages[error.code] || error.message, true);
+  }
 });
 
-notesInput.addEventListener('input', event => {
-  localStorage.setItem(STORAGE_KEYS.notes, event.target.value);
-});
+authModeToggle.addEventListener("click", () => { createMode = !createMode; authTitle.textContent = createMode ? "Create account" : "Welcome back"; authSubmit.textContent = createMode ? "Create account" : "Sign in"; authModeToggle.textContent = createMode ? "Already have an account? Sign in" : "New here? Create an account"; });
+signOutBtn.addEventListener("click", () => signOut(auth));
+taskForm.addEventListener("submit", event => { event.preventDefault(); const text = taskInput.value.trim(); if (!text) return; tasks.unshift({ id: uid(), text, done: false }); taskInput.value = ""; renderTasks(); queueSave(); });
+notesInput.addEventListener("input", queueSave);
+clearAllBtn.addEventListener("click", () => { if (confirm("Clear all tasks?")) { tasks = []; renderTasks(); queueSave(); } });
+document.querySelectorAll(".quick-action").forEach(button => button.addEventListener("click", () => { taskInput.value = button.dataset.task || ""; taskInput.focus(); }));
+startTimerBtn.addEventListener("click", toggleTimer);
+resetTimerBtn.addEventListener("click", resetTimer);
+themeToggle.addEventListener("click", () => { applyTheme(document.body.classList.contains("light-mode") ? "dark" : "light"); queueSave(); });
 
-document.querySelectorAll('.idea').forEach(button => {
-  button.addEventListener('click', () => {
-    const value = button.dataset.idea || '';
-    if (!value) return;
-    taskInput.value = value;
-    taskInput.focus();
-  });
-});
-
-clearAllBtn.addEventListener('click', () => {
-  const shouldClear = window.confirm('Clear all tasks?');
-  if (!shouldClear) return;
-
-  saveTasks([]);
-  renderTasks();
-});
-
-function initialize() {
-  const storedNotes = localStorage.getItem(STORAGE_KEYS.notes) || '';
-  notesInput.value = storedNotes;
-  updateGreeting();
-  renderTasks();
-}
-
-initialize();
+updateGreeting();
+updateTimer();
